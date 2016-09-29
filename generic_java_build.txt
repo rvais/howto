@@ -18,6 +18,10 @@ require the full Java SDK will want to set that to `true` to avoid unexpected
 results when looking up a JVM when some of the installed JRE's don't have the
 corresponding SDK (*-devel package) installed.
 
+Important thing to note is that this macro has been marked as deprecated and
+in the future will be replaced by `Java launcher macro`. You should keep an eye
+on future changes in this documentation.
+
 [source,spec]
 --------
 %install

@@ -45,6 +45,9 @@ install -p -m 644 helloworld.jar %{buildroot}%{_javadir}/helloworld.jar
 
 # We use macro %jpackage_script to generate wrapper script for our JAR
 # Will be explained in later sections
+#
+# IMPORTANT: This macro has been marked as deprecated and will be replaced 
+# by Java launcher macro in the future.
 %jpackage_script org.fedoraproject.helloworld.HelloWorld "" "" %{name} helloworld true
 
 # List of files that this package installs on the system
@@ -53,5 +56,9 @@ install -p -m 644 helloworld.jar %{buildroot}%{_javadir}/helloworld.jar
 %{_bindir}/helloworld
 
 %changelog
+* Thu Sep 29 2016 Roman Vais <rvais@redhat.com> - 1.0-1
+- Macro 'jpackage_script()' has been marked as deprecated and you should not use
+  it anymore. See documentation for details.
+
 * Tue Mar 19 2013 Stanislav Ochotnicky <sochotnicky@redhat.com> - 1.0-1
 - This is first version
