@@ -7,3 +7,5 @@ will cover basic packaging principles
  * Single library version
  * Links to other appropriate documents
  * ...
+
+include::how_to_package.txt[]

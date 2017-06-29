@@ -1,0 +1,164 @@
+=== How to actually work with packages?
+
+In Fedora, there are already some tools and scripts that are supposed
+to make packager's work easier and faster. In this part of a document
+you can find everything you need to quickly create or update package
+even thou you don't necessarly know how exactly it works or some of
+the details. This is just to get your job done.
+
+TIP: Even thou you don't need to understand in great detail what is
+actually happening for following these steps, to be able to perform
+the task itself you do. Please, read the rest of a documenti and
+the linked sources as well.
+
+Here are the most useful tools in no particular order. ::
+
+link:https://fedoraproject.org/wiki/Rpmdevtools[RPM dev tools]::
+
+    These tools are usefull for work with the spec files. What they do
+    is very simple,but there are usecases for these.
+
+link:https://fedoraproject.org/w/uploads/1/1c/Fedpkg-presentation.pdf[fedpkg tool]::
+
+    Front-end to the Fedora infrastructure for package maintainers grooping
+    together some of the tools for easier access and use.
+
+link:https://fedoraproject.org/wiki/Koji[koji]::
+
+    Tool for building the packages, in case of actual build accessed through
+    the fedpkg command. Otherwise for remote mockup builds of large packages
+    or packages with a lot of dependencies that would take too long on your
+    machine using mock.
+
+link:https://github.com/rpm-software-management/mock/wiki[mock and mockchain]::
+
+    Tool for quick local builds to check everything works as intended 
+    useful when building small packages with low number of dependencies
+    and allows you to inspect the actuall state of thing after build is
+    finnished. Not only acces to logs.
+
+link:https://fedoraproject.org/wiki/DNF?rd=Dnf[dnf]::
+
+    Yes, you are installing and updating packages on your machine with this.
+    But it has other useful functionality. Dnf allows you to get to know 
+    dependencies of existing packages or which packages depends on the
+    one you are updating.
+
+==== Update package
+
+If you have already existing package and you just need to quickly
+update it to new version, first you must get the current spec file.
+Best way to start is to have (create) some dedicated directory
+in your /home where you will be updating all the packages. Let's
+call this directory _FedoraPkgs_ and package you are updating eg.
+_helloworld_. Type into your cmd line commands from following
+example and you should see something similar:
+
+[source,shell]
+------
+$ cd ~/FedoraPkgs
+$ fedpkg clone helloworld
+Enter passphrase for key '/home/userPackager/.ssh/id_rsa': 
+remote: Counting objects: 42, done.
+remote: Compressing objects: 100% (39/39), done.
+remote: Total 42 (delta 21), reused 3 (delta 1)
+Receiving objects: 100% (42/42), 23.27 KiB | 0 bytes/s, done.
+Resolving deltas: 100% (22/22), done.
+Checking connectivity... done.
+$ ls
+0001-helloworld.patch  helloworld.spec sources
+------
+
+_What have I done just now ?_ you might ask. Fedpkg tool created
+a copy of git repository that contains information about the package.
+Files with extension *.patch are patches (obviously) that were necessary
+to make build work. Or it just corrects some typos in javadoc.
+The _sources_ file contains information about uploaded sources for the
+package. But most important for us is the spec file. We need to update
+spec file in order to update the package.
+
+In case of minor version update, patches might still apply so it will
+be necessary to verify that with use of mock. More about that later.
+All you have to do now is basicaly just update the version number and
+add change log message about what you have done. 
+
+WARNING: If you need to add change log message, you should not edit
+it ``by hand'' in a text editor. It is error prone approach. You can
+easily make a typo or other unwanted changes. You sould always use
+_rpmdev-bumpspec_ tool to add change log message. It will bump release
+number as well. If you are changing version of package, reset realease
+number to zero before using _rpmdev-bumpspec_.
+
+Links for package sources ususally do not require change of URL, because
+they tend to stay the same with only version number different. It is
+a common practise to write URLs with version macro so it is changed to
+correct one if version number is changed. To verify if URL is correct,
+simply download the sources. We will need them anyway.
+
+[source,shell]
+------
+$ spectool --get-files helloworld.spec
+Getting http://www.example.org/helloworld/helloworld-2.0.4.tar.gz to ./helloworld-2.0.4.tar.gz
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100 109k  100 109k    0     0  1891k      0  0:00:01  0:00:01 --:--:-- 1890k
+------
+
+Now we need to create source RPM to build package and verify that everithing
+is ok. We can do that by commands from following example. For more details
+check out link:http://rpm.org/documentation.html[RPM documentation].
+[source,shell]
+------
+$ rpmbuild -bs -D"_sourcedir $PWD" *.spec
+Wrote: /home/userPackager/rpmbuild/SRPMS/helloworld-2.0.4-1.fc26.src.rpm
+$ mv /home/rvais/rpmbuild/SRPMS/helloworld-2.0.4-1.fc26.src.rpm "$PWD"
+------
+
+With source RPM (srpm in short) we can try to perform a build. There are two
+equaly valid ways how we can try to build a package to verify everything is
+working. We can use our local machine wit helping hand of a mock tool, or we
+can try to build it remotely using koji. Both will provide you with build log
+where you can find all necessary information if anything goes wrong so you can
+fix that. here are commands for both variants.
+
+[source,shell]
+------
+$ koji build --scratch helloworld-2.0.4-1.fc26.src.rpm
+------
+
+or 
+
+[source,shell]
+------
+$ mock --init
+$ mock --no-clean helloworld-2.0.4-1.fc26.src.rpm
+------
+
+If everything works as intended it just means that package it self
+works. But our packag can have some other packages that are dependant
+on it. We need to check (dnf tool) whether or not such packages do
+exist and verify they won't break. For that we need srpms for all
+dependant packages we want to check. There might be too many to check
+every single one. Mockchain is tool for this job. It is slightly
+modified version of mock that builds one or more packages specified by
+their srpms one after another. Packages are build as a chain in the
+same order as their srpms were specified on a command line. Curently
+build package is beeing build with use of previous ones.
+
+[source,shell]
+------
+$ mockchain -r default helloworld-2.0.4-1.fc26.src.rpm
+------
+
+Everything is in order and no broken packages? Great! Just add new
+upstream sources to fedora, commit and push all the changes you have
+made with git.
+
+[source,shell]
+------
+$ fedpkg new-sources helloworld-2.0.4.tar.gz
+------
+
+
+
+
